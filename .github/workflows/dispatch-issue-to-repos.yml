@@ -83,6 +83,22 @@ jobs:
             ];
 
             for (const target of targets) {
+              const repoName = `${target.owner}/${target.repo}`;
+
+              try {
+                await github.rest.repos.get({
+                  owner: target.owner,
+                  repo: target.repo
+                });
+              } catch (error) {
+                core.setFailed(
+                  `Cannot access ${repoName} with ORCHESTRATOR_REPO_DISPATCH_TOKEN. ` +
+                  `Check that the repository name is correct and the token has access to it. ` +
+                  `GitHub returned ${error.status || 'unknown status'}: ${error.message}`
+                );
+                return;
+              }
+
               await github.rest.repos.createDispatchEvent({
                 owner: target.owner,
                 repo: target.repo,
@@ -94,11 +110,19 @@ jobs:
                   orchestrator_issue_body: process.env.ISSUE_BODY || '',
                   orchestrator_issue_url: process.env.ISSUE_URL,
                   orchestrator_issue_author: process.env.ISSUE_AUTHOR,
+                  issue_number: Number(process.env.ISSUE_NUMBER),
+                  issue: {
+                    number: Number(process.env.ISSUE_NUMBER),
+                    title: process.env.ISSUE_TITLE,
+                    body: process.env.ISSUE_BODY || '',
+                    url: process.env.ISSUE_URL,
+                    author: process.env.ISSUE_AUTHOR
+                  },
                   target_role: target.role
                 }
               });
 
-              core.info(`Dispatched issue #${process.env.ISSUE_NUMBER} to ${target.owner}/${target.repo}`);
+              core.info(`Dispatched issue #${process.env.ISSUE_NUMBER} to ${repoName}`);
             }
 
       - name: Comment on orchestrator issue
