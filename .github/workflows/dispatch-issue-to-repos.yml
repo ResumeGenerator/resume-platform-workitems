@@ -106,7 +106,6 @@ jobs:
                 client_payload: {
                   orchestrator_repo: `${context.repo.owner}/${context.repo.repo}`,
                   issue_repository: `${context.repo.owner}/${context.repo.repo}`,
-                  source_repository: `${context.repo.owner}/${context.repo.repo}`,
                   orchestrator_issue_number: Number(process.env.ISSUE_NUMBER),
                   orchestrator_issue_title: process.env.ISSUE_TITLE,
                   orchestrator_issue_body: process.env.ISSUE_BODY || '',
