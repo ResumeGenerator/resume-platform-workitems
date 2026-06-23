@@ -1,7 +1,7 @@
 name: OpenAI Usage Report Email
 
 on:
-  workflow_dispatch:   # Manual trigger
+  workflow_dispatch:   # Manual trigger (run anytime from Actions tab)
   schedule:
     - cron: "15 11 * * *"   # 2:15 PM Doha (11:15 UTC)
 
@@ -15,10 +15,22 @@ jobs:
             https://api.openai.com/v1/dashboard/billing/usage \
             -o usage.json
 
-      - name: Generate report
+      - name: Debug raw JSON (optional)
+        run: cat usage.json
+
+      - name: Generate inline report
+        id: report
         run: |
+          TOTAL=$(jq '.total_usage' usage.json)
           echo "OpenAI Usage Report - $(date)" > REPORT.txt
-          jq '.daily_usage' usage.json >> REPORT.txt
+          echo "Total Usage: $TOTAL" >> REPORT.txt
+          echo "" >> REPORT.txt
+          echo "Daily Costs:" >> REPORT.txt
+          jq -r '.daily_costs[] | "\(.timestamp): \(.cost)"' usage.json >> REPORT.txt
+          REPORT_BODY=$(cat REPORT.txt)
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send email via Gmail
         uses: dawidd6/action-send-mail@v3
@@ -28,13 +40,6 @@ jobs:
           username: ${{ secrets.GMAIL_USER }}
           password: ${{ secrets.GMAIL_PASS }}
           subject: "Daily OpenAI Usage Report"
-          to: bijum777@gmail.com
+          to: biju777@gmail.com
           from: ${{ secrets.GMAIL_USER }}
-          body: |
-            Hello,
-
-            Please find attached the latest OpenAI usage report.
-
-            Regards,
-            GitHub Workflow
-          attachments: REPORT.txt
+          body: ${{ steps.report.outputs.body }}
