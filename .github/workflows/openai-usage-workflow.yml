@@ -1,7 +1,7 @@
 name: OpenAI Usage Report Email
 
 on:
-  workflow_dispatch:   # Manual trigger (run anytime from Actions tab)
+  workflow_dispatch:   # Manual trigger
   schedule:
     - cron: "15 11 * * *"   # 2:15 PM Doha (11:15 UTC)
 
@@ -9,30 +9,27 @@ jobs:
   usage-report:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch usage stats (past 7 days)
+      - name: Fetch usage stats (last 3 days)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          START=$(date -d '7 days ago' +%Y-%m-%d)
-          END=$(date +%Y-%m-%d)
-          curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
-            "https://api.openai.com/v1/usage?start_date=$START&end_date=$END" \
-            -o usage.json
-
-      - name: Debug raw JSON (optional)
-        run: cat usage.json
-
-      - name: Generate inline report
-        id: report
-        run: |
           echo "OpenAI Usage Report - $(date)" > REPORT.txt
+          echo "" >> REPORT.txt
 
-          if [ "$(jq '.data | length' usage.json)" -eq 0 ]; then
-            echo "No usage data available for the past 7 days." >> REPORT.txt
-          else
-            echo "Usage (past 7 days):" >> REPORT.txt
-            jq -r '.data[] | "\(.date): \(.model) total_tokens=\(.n_total_tokens)"' usage.json >> REPORT.txt
-          fi
+          for i in 0 1 2; do
+            DAY=$(date -d "$i days ago" +%Y-%m-%d)
+            echo "=== $DAY ===" >> REPORT.txt
+            curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
+              "https://api.openai.com/v1/usage?date=$DAY" \
+              -o usage.json
+
+            if [ "$(jq '.data | length' usage.json)" -eq 0 ]; then
+              echo "No usage data available." >> REPORT.txt
+            else
+              jq -r '.data[] | "\(.model): prompt_tokens=\(.n_prompt_tokens), completion_tokens=\(.n_completion_tokens), total=\(.n_total_tokens)"' usage.json >> REPORT.txt
+            fi
+            echo "" >> REPORT.txt
+          done
 
           REPORT_BODY=$(cat REPORT.txt)
           echo "body<<EOF" >> $GITHUB_OUTPUT
@@ -46,7 +43,7 @@ jobs:
           server_port: 587
           username: ${{ secrets.GMAIL_USER }}
           password: ${{ secrets.GMAIL_PASS }}
-          subject: "Weekly OpenAI Usage Report"
+          subject: "3-Day OpenAI Usage Report"
           to: biju777@gmail.com
           from: ${{ secrets.GMAIL_USER }}
           body: ${{ steps.report.outputs.body }}
