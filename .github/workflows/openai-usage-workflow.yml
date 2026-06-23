@@ -1,7 +1,7 @@
 name: OpenAI Usage Report Email
 
 on:
-  workflow_dispatch:   # Manual trigger (run anytime from Actions tab)
+  workflow_dispatch:   # Manual trigger
   schedule:
     - cron: "15 11 * * *"   # 2:15 PM Doha (11:15 UTC)
 
@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fetch usage stats
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
             https://api.openai.com/v1/dashboard/billing/usage \
@@ -22,13 +24,9 @@ jobs:
         id: report
         run: |
           echo "OpenAI Usage Report - $(date)" > REPORT.txt
-
-          # Try to extract total_usage, fallback to N/A
           TOTAL=$(jq -r '.total_usage // "N/A"' usage.json)
           echo "Total Usage: $TOTAL" >> REPORT.txt
           echo "" >> REPORT.txt
-
-          # Try to extract daily_costs or data[] if available
           if jq -e '.daily_costs' usage.json > /dev/null; then
             echo "Daily Costs:" >> REPORT.txt
             jq -r '.daily_costs[]? | "\(.timestamp): \(.cost)"' usage.json >> REPORT.txt
@@ -38,7 +36,6 @@ jobs:
           else
             echo "No usage data available." >> REPORT.txt
           fi
-
           REPORT_BODY=$(cat REPORT.txt)
           echo "body<<EOF" >> $GITHUB_OUTPUT
           echo "$REPORT_BODY" >> $GITHUB_OUTPUT
