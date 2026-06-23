@@ -21,12 +21,24 @@ jobs:
       - name: Generate inline report
         id: report
         run: |
-          TOTAL=$(jq '.total_usage' usage.json)
           echo "OpenAI Usage Report - $(date)" > REPORT.txt
+
+          # Try to extract total_usage, fallback to N/A
+          TOTAL=$(jq -r '.total_usage // "N/A"' usage.json)
           echo "Total Usage: $TOTAL" >> REPORT.txt
           echo "" >> REPORT.txt
-          echo "Daily Costs:" >> REPORT.txt
-          jq -r '.daily_costs[] | "\(.timestamp): \(.cost)"' usage.json >> REPORT.txt
+
+          # Try to extract daily_costs or data[] if available
+          if jq -e '.daily_costs' usage.json > /dev/null; then
+            echo "Daily Costs:" >> REPORT.txt
+            jq -r '.daily_costs[]? | "\(.timestamp): \(.cost)"' usage.json >> REPORT.txt
+          elif jq -e '.data' usage.json > /dev/null; then
+            echo "Daily Breakdown:" >> REPORT.txt
+            jq -r '.data[]? | "\(.timestamp): \(.usage)"' usage.json >> REPORT.txt
+          else
+            echo "No usage data available." >> REPORT.txt
+          fi
+
           REPORT_BODY=$(cat REPORT.txt)
           echo "body<<EOF" >> $GITHUB_OUTPUT
           echo "$REPORT_BODY" >> $GITHUB_OUTPUT
