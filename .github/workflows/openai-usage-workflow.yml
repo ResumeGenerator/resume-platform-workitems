@@ -1,0 +1,40 @@
+name: OpenAI Usage Report Email
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 6 AM UTC
+    - cron: "0 18 * * *"  # 6 PM UTC
+
+jobs:
+  usage-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch usage stats
+        run: |
+          curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
+            https://api.openai.com/v1/dashboard/billing/usage \
+            -o usage.json
+
+      - name: Generate report
+        run: |
+          echo "OpenAI Usage Report - $(date)" > REPORT.txt
+          jq '.daily_usage' usage.json >> REPORT.txt
+
+      - name: Send email via Gmail
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_PASS }}
+          subject: "Daily OpenAI Usage Report"
+          to: biju@example.com
+          from: ${{ secrets.GMAIL_USER }}
+          body: |
+            Hello,
+
+            Please find attached the latest OpenAI usage report.
+
+            Regards,
+            GitHub Workflow
+          attachments: REPORT.txt
